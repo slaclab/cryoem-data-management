@@ -1,0 +1,104 @@
+#!/bin/bash
+
+declare -a PURGE
+PURGE=( CS01 CS04 CS07 CS10 CS11 CS12 CS16 CS17 CS26 CS29 CS32 CS36 CS45 CS48 CS51 CF01 CF02 CD00 CD01  )
+
+###
+# should delete
+###
+#CS25 - stearns - check again
+#CS07
+#CS11
+#CS12
+
+###
+# shoudl KEEP due to collaborations with Wah's group
+###
+#CS02 - arvin
+#CS03 - kornberg
+#CS06 - watasuki
+#CS08 - moerner
+#CS09 - bushnell?
+#CS13 - boothryod with stella
+#CS14 - cgati
+#CS15 - cui with weijiang
+#CS17 - jadezsky
+#CS19 - kobilka - ????
+#CS20 - kirkegaard
+#CS22 - demarci
+#CS27 - yeh, with setella
+#CS30 - cochran with boxue
+#CS31 - yeah with setall
+#CS33 - montain with gcsu
+#CS34 - lu with patrick
+#CS38 - ctc40
+#CS39 - kmzhang
+#CS41 - kmzhang
+#CS42 - wukon
+#CS43 - wah with skiniotis?
+#CS47 - cagelski with lydia
+#CS48
+#CS50 - cui with ydia
+#CS57 - wukon
+#CS58 - gcsu
+#CS61 - ctc40
+#CS72 - ctc40
+#CS80 - das with kmzhang
+#CS81 - kmzhang
+#CS82 - kmzhang
+#CS99 - ?
+
+PARAMS=""
+FORCE=0
+DRY_RUN=0
+MTIME='+28'
+while (( "$#" )); do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -f|--force) # actually delete
+      FORCE=1
+      shift
+      ;;
+    -d|--days) # actually delete
+      shift
+      MTIME='+'$1
+      shift
+      ;;
+    -*|--*=) # unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
+BASEDIR=$1
+
+#echo 'MTIME ' $MTIME
+#echo 'BASE ' $BASEDIR
+
+cd $BASEDIR
+for i in `find . -maxdepth 1 -type d -mtime $MTIME \( -name '*_TEM1' -or -name '*_TEM4' \)`; do
+  #echo $i
+  for p in ${PURGE[@]}; do
+    #echo "Trying $p..."
+    s="\-$p\_"
+    if [ -z "${i##*$s*}" ]; then
+      #echo "FOUND $p"
+      echo "tree -if $i > $i.deleted && rm -rf $i"
+      if [[ ${DRY_RUN} == 0 && ${FORCE} == 1 ]]; then
+        tree -if $i > $i.deleted && rm -rf $i
+      fi
+      #echo
+    fi
+  done
+done
+
