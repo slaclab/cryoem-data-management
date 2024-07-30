@@ -467,7 +467,7 @@ if __name__ == "__main__":
 
   # delete folders if they've transfered okay
   # 1) case where it all uploaded prior
-  if len(execute) == 0 and not is_exp_directory( directory ):
+  if len(execute) == 0 and not is_exp_directory( directory ) and not args.do_not_delete and args.force:
     logger.error(f"ABOUT TO DELETE {directory}")
     # remove dry_rund
     delete_folder( directory, dry_run=not args.force )
