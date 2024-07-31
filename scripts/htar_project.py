@@ -148,7 +148,7 @@ def create_htar_extract_script( script_path, file_lists, directory, folder, htar
   text = header % ( directory, folder )
   logger.warning( "Creating restore script %s" % (script_path,))
   for d in file_lists:
-    archive = Path( f"{hsi_prefix}/{directory}/{folder}.{d['archive_number']}.tar" )
+    archive = Path( f"{hsi_prefix}/{folder}/{folder}.{d['archive_number']}.tar" )
     cmd = f"{htar_path} -xv -f {os.path.normpath(archive)}"
     text += f"{cmd}\n"
   text += "\n"
