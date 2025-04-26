@@ -70,6 +70,11 @@ main() {
     LOGFILE=/tmp/slack_archive_channel.log
   fi
 
+  if [ -f "${LOGFILE}" ]; then
+    # clear log file before starting
+    rm "${LOGFILE}"
+  fi
+
   if [ -z "${TOKEN}" ]; then
     echo "ENV TOKEN not set" 
     exit 1
@@ -78,20 +83,23 @@ main() {
   CHANNEL_LIST=()
   NEXT_CURSOR=""
   while true; do
-      # save each page of output from the Slack users.conversations api call
+      # save each page of output from the Slack conversations.list api call
       log_to_file "${LOGFILE}" "get response for NEXT_CURSOR = ${NEXT_CURSOR}"
-      RESPONSE=$(curl "https://slack.com/api/conversations.list?limit=1000&types=private_channel&token=${TOKEN}&exclude_archived=true&pretty=1&cursor=${NEXT_CURSOR}")
+      RESPONSE=$(curl -H "Authorization: Bearer ${TOKEN}" -X POST -d "limit=100" -d "types=private_channel" -d "exclude_archived=true" -d "pretty=1" -d "cursor=${NEXT_CURSOR}" "https://slack.com/api/conversations.list")
       if [ $(echo "${RESPONSE}" | "${JQ_EXE}" ".channels | length") -gt 0 ]; then
-          for ch in $(echo "${RESPONSE}" | "${JQ_EXE}" -r ".channels[] | select(.name | contains(\"${PATTERN}\") ) | .id"); do 
-              #log_to_file "${LOGFILE}" "Adding channel ${ch} to CHANNEL_LIST"
-              set -f
+          log_to_file "${LOGFILE}" "Found $(echo "${RESPONSE}" | "${JQ_EXE}" ".channels | length") channels..."
+          FOUND_CHANNELS=$(echo "${RESPONSE}" | "${JQ_EXE}" -cr -j '"\(.channels[] | select(.name | contains("'"${PATTERN}"'") ) | .id) "' | sed -e 's/[[:space:]]*$//')
+          log_to_file "${LOGFILE}" "FOUND_CHANNELS = ${FOUND_CHANNELS[*]}"
+          for ch in $(echo "${FOUND_CHANNELS}"); do
+              log_to_file "${LOGFILE}" "Adding channel ${ch} to CHANNEL_LIST"
+              #set -f
               CHANNEL_LIST+=(${ch/\n// })
               log_to_file "${LOGFILE}" "CHANNEL_LIST = ${CHANNEL_LIST[*]}"
           done
       fi
   
       RESPONSE_METADATA=$(echo "${RESPONSE}" | "${JQ_EXE}" -r ". | select(.response_metadata != \"\" and .response_metadata != null) | .response_metadata")
-      if [[ "${RESPONSE_METADATA}" != "{}" ]]; then
+      if [ "${RESPONSE_METADATA}" != "{}" ]; then
           if [ ! -z $(echo "${RESPONSE_METADATA}" | "${JQ_EXE}" -r ".next_cursor") ]; then
                NEXT_CURSOR=$(echo "${RESPONSE_METADATA}" | "${JQ_EXE}" -r ".next_cursor")
                log_to_file "${LOGFILE}" "set NEXT_CURSOR=${NEXT_CURSOR}"
@@ -103,7 +111,7 @@ main() {
           NEXT_CURSOR=""
       fi
   
-      if [[ -z "${NEXT_CURSOR}" ]]; then
+      if [ -z "${NEXT_CURSOR}" ]; then
          log_to_file "${LOGFILE}" "Breaking loop..."
          break
       fi
@@ -112,11 +120,11 @@ main() {
   #archive_channels
   log_to_file "${LOGFILE}" "# of channels to archive: ${#CHANNEL_LIST[@]}"
   for ch in "${CHANNEL_LIST[@]}"; do 
-      CHANNEL_INFO=$(curl "https://slack.com/api/conversations.info?token=${TOKEN}&channel=${ch}")
+      CHANNEL_INFO=$(curl -H "Authorization: Bearer ${TOKEN}" -X POST -d "channel=${ch}"  "https://slack.com/api/conversations.info")
       CHANNEL_NAME=$(echo "${CHANNEL_INFO}" | "${JQ_EXE}" -r ". | select(.ok == true) | .channel.name")
   
       log_to_file "${LOGFILE}" "Archiving channel ID ${ch}: ${CHANNEL_NAME}"
-      RESPONSE=$(curl "https://slack.com/api/conversations.archive?token=${TOKEN}&channel=${ch}")
+      RESPONSE=$(curl -H "Authorization: Bearer ${TOKEN}" -X POST -d "channel=${ch}" "https://slack.com/api/conversations.archive")
       if [ $(echo ${RESPONSE} | "${JQ_EXE}" -r ". | select(.ok == false) | .error" ) ]; then
           log_to_file "${LOGFILE}" "$(echo ${RESPONSE} | "${JQ_EXE}" -r ". | select(.ok == false) | .error")"    
       fi
